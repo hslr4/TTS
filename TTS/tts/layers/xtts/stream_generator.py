@@ -341,6 +341,7 @@ class NewGenerationMixin(GenerationMixin):
             generation_config=generation_config, stopping_criteria=stopping_criteria
         )
         # 10. go into different generation modes
+        '''
         if is_greedy_gen_mode:
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
@@ -360,8 +361,8 @@ class NewGenerationMixin(GenerationMixin):
                 synced_gpus=synced_gpus,
                 **model_kwargs,
             )
-
-        elif is_contrastive_search_gen_mode:
+        '''
+        if is_contrastive_search_gen_mode:
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
                     f"num_return_sequences has to be 1, but is {generation_config.num_return_sequences} when doing"
@@ -407,9 +408,9 @@ class NewGenerationMixin(GenerationMixin):
                 synced_gpus=synced_gpus,
                 **model_kwargs,
             )
-        elif is_sample_gen_stream_mode:
+        elif is_sample_gen_stream_mode or is_greedy_gen_mode:
             # 11. prepare logits warper
-            logits_warper = self._get_logits_warper(generation_config)
+            logits_warper = self._get_logits_warper(generation_config) if is_sample_gen_stream_mode else None
 
             # 12. expand input_ids with `num_return_sequences` additional sequences per batch
             input_ids, model_kwargs = self._expand_inputs_for_generation(
@@ -430,6 +431,7 @@ class NewGenerationMixin(GenerationMixin):
                 output_scores=generation_config.output_scores,
                 return_dict_in_generate=generation_config.return_dict_in_generate,
                 synced_gpus=synced_gpus,
+                do_sample=is_sample_gen_stream_mode,
                 **model_kwargs,
             )
         elif is_beam_gen_mode:
@@ -655,6 +657,7 @@ class NewGenerationMixin(GenerationMixin):
         output_scores: Optional[bool] = None,
         return_dict_in_generate: Optional[bool] = None,
         synced_gpus: Optional[bool] = False,
+        do_sample: Optional[bool] = True,
         **model_kwargs,
     ) -> Union[SampleOutput, torch.LongTensor]:
         r"""
@@ -774,7 +777,7 @@ class NewGenerationMixin(GenerationMixin):
                 UserWarning,
             )
             stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
-        logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
+        logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList() if do_sample else None
         pad_token_id = pad_token_id if pad_token_id is not None else self.generation_config.pad_token_id
         eos_token_id = eos_token_id if eos_token_id is not None else self.generation_config.eos_token_id
         if isinstance(eos_token_id, int):
@@ -832,7 +835,9 @@ class NewGenerationMixin(GenerationMixin):
 
             # pre-process distribution
             next_token_scores = logits_processor(input_ids, next_token_logits)
-            next_token_scores = logits_warper(input_ids, next_token_scores)
+            
+            if logits_warper is not None:
+                next_token_scores = logits_warper(input_ids, next_token_scores)
 
             # Store scores, attentions and hidden_states when required
             if return_dict_in_generate:
@@ -851,9 +856,12 @@ class NewGenerationMixin(GenerationMixin):
                     )
 
             # sample
-            probs = nn.functional.softmax(next_token_scores, dim=-1)
-            next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
-
+            if do_sample:
+                probs = nn.functional.softmax(next_token_scores, dim=-1)
+                next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
+            else:
+                next_tokens = torch.argmax(next_token_scores, dim=-1)
+                
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
                 if pad_token_id is None:
