@@ -1,4 +1,6 @@
 import os
+import logging
+
 from dataclasses import dataclass
 
 import librosa
@@ -14,6 +16,9 @@ from TTS.tts.layers.xtts.tokenizer import VoiceBpeTokenizer, split_sentence
 from TTS.tts.layers.xtts.xtts_manager import SpeakerManager, LanguageManager
 from TTS.tts.models.base_tts import BaseTTS
 from TTS.utils.io import load_fsspec
+
+from torch2trt import torch2trt, TRTModule
+import tensorrt as trt
 
 init_stream_support()
 
@@ -249,6 +254,8 @@ class Xtts(BaseTTS):
             d_vector_dim=self.args.d_vector_dim,
             cond_d_vector_in_each_upsampling_layer=self.args.cond_d_vector_in_each_upsampling_layer,
         )
+        
+        self.hifigan_decoder_trt = None
 
     @property
     def device(self):
@@ -643,12 +650,13 @@ class Xtts(BaseTTS):
 
             assert (
                 text_tokens.shape[-1] < self.args.gpt_max_text_tokens
-            ), " ❗ XTTS can only generate text with a maximum of 400 tokens."
+            ), "XTTS can only generate text with a maximum of 400 tokens."
 
             fake_inputs = self.gpt.compute_embeddings(
                 gpt_cond_latent.to(self.device),
                 text_tokens,
             )
+
             gpt_generator = self.gpt.get_generator(
                 fake_inputs=fake_inputs,
                 top_k=top_k,
@@ -684,7 +692,12 @@ class Xtts(BaseTTS):
                         gpt_latents = F.interpolate(
                             gpt_latents.transpose(1, 2), scale_factor=length_scale, mode="linear"
                         ).transpose(1, 2)
-                    wav_gen = self.hifigan_decoder(gpt_latents, g=speaker_embedding.to(self.device))
+
+                    if self.hifigan_decoder_trt:
+                        wav_gen = self.hifigan_decoder_trt(gpt_latents, speaker_embedding)
+                    else:
+                        wav_gen = self.hifigan_decoder(gpt_latents, speaker_embedding)
+                        
                     wav_chunk, wav_gen_prev, wav_overlap = self.handle_chunks(
                         wav_gen.squeeze(), wav_gen_prev, wav_overlap, overlap_wav_len
                     )
@@ -737,6 +750,7 @@ class Xtts(BaseTTS):
         eval=True,
         strict=True,
         use_deepspeed=False,
+        use_tensorrt=False,
         speaker_file_path=None,
     ):
         """
@@ -749,7 +763,8 @@ class Xtts(BaseTTS):
             vocab_path (str, optional): The path to the vocabulary file. Defaults to None.
             eval (bool, optional): Whether to set the model to evaluation mode. Defaults to True.
             strict (bool, optional): Whether to strictly enforce that the keys in the checkpoint match the keys in the model. Defaults to True.
-
+            use_tensorrt (bool|str): Whether to use TensorRT for HiFiGAN or not, with fp16 precision if true.
+                                     If supply a string for use_tensorrt='fp32' or use_tensorrt='fp16'
         Returns:
             None
         """
@@ -785,6 +800,32 @@ class Xtts(BaseTTS):
             self.gpt.init_gpt_for_inference(kv_cache=self.args.kv_cache, use_deepspeed=use_deepspeed)
             self.gpt.eval()
 
+        if use_tensorrt:
+            use_fp16 = (flag == 'fp16' if isinstance(use_tensorrt, str) else True)
+            trt_path = os.path.join(os.path.dirname(model_path), f"hifigan_decoder_{'fp16' if use_fp16 else 'fp32'}.trt")
+            
+            try:
+                if os.path.isfile(trt_path):
+                    logging.info(f"loading hifigan_decoder TensorRT engine from {trt_path}")
+                    self.hifigan_decoder_trt = TRTModule()
+                    self.hifigan_decoder_trt.load_state_dict(torch.load(trt_path))
+                else:
+                    gpt_latents = torch.rand(1, 20, 1024, dtype=torch.float32, device=self.device)
+                    speaker_embedding = torch.rand(1, 512, 1, dtype=torch.float32, device=self.device)
+                    
+                    self.hifigan_decoder_trt = torch2trt(
+                        self.hifigan_decoder, [gpt_latents, speaker_embedding], log_level=trt.Logger.VERBOSE,
+                        min_shapes=[(1, 1, 1024), (1, 512, 1)],
+                        max_shapes=[(1, 400, 1024), (1, 512, 1)],
+                        opt_shapes=[(1, 20, 1024), (1, 512, 1)],
+                        use_onnx=True,
+                        fp16_mode=use_fp16,
+                    )
+                    torch.save(self.hifigan_decoder_trt.state_dict(), use_fp16)
+            except Exception as error:
+                logging.error(f"Encountered exception generating hifigan_decoder TensorRT engine for {trt_path}\n{error}")
+                self.hifigan_decoder_trt = None
+                            
     def train_step(self):
         raise NotImplementedError(
             "XTTS has a dedicated trainer, please check the XTTS docs: https://tts.readthedocs.io/en/dev/models/xtts.html#training"
