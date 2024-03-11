@@ -823,7 +823,7 @@ class Xtts(BaseTTS):
                     )
                     torch.save(self.hifigan_decoder_trt.state_dict(), use_fp16)
             except Exception as error:
-                logging.error(f"Encountered exception generating hifigan_decoder TensorRT engine for {trt_path}\n{error}")
+                logging.error(f"Encountered exception generating hifigan_decoder TensorRT engine:\n{error}")
                 self.hifigan_decoder_trt = None
                             
     def train_step(self):

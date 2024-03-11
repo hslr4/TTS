@@ -1,5 +1,7 @@
 
 ## 🐸Coqui.ai News
+** This fork adds support for quantization and TensorRT in xtts HiFiGAN decoder**
+
 - 📣 ⓍTTSv2 is here with 16 languages and better performance across the board.
 - 📣 ⓍTTS fine-tuning code is out. Check the [example recipes](https://github.com/coqui-ai/TTS/tree/dev/recipes/ljspeech).
 - 📣 ⓍTTS can now stream with <200ms latency.
@@ -14,7 +16,6 @@
 ## <img src="https://raw.githubusercontent.com/coqui-ai/TTS/main/images/coqui-log-green-TTS.png" height="56"/>
 
 **🐸TTS is a library for advanced Text-to-Speech generation.**
-** This fork adds support for quantization and TensorRT**
 
 🚀 Pretrained models in +1100 languages.
 
