@@ -13,8 +13,8 @@
 
 ## <img src="https://raw.githubusercontent.com/coqui-ai/TTS/main/images/coqui-log-green-TTS.png" height="56"/>
 
-
 **🐸TTS is a library for advanced Text-to-Speech generation.**
+** This fork adds support for quantization and TensorRT**
 
 🚀 Pretrained models in +1100 languages.
 
