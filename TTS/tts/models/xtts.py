@@ -816,7 +816,7 @@ class Xtts(BaseTTS):
                     self.hifigan_decoder_trt = torch2trt(
                         self.hifigan_decoder, [gpt_latents, speaker_embedding], log_level=trt.Logger.VERBOSE,
                         min_shapes=[(1, 1, 1024), (1, 512, 1)],
-                        max_shapes=[(1, 400, 1024), (1, 512, 1)],
+                        max_shapes=[(1, 512, 1024), (1, 512, 1)],
                         opt_shapes=[(1, 20, 1024), (1, 512, 1)],
                         use_onnx=True,
                         fp16_mode=use_fp16,
