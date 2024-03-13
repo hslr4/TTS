@@ -821,7 +821,7 @@ class Xtts(BaseTTS):
                         use_onnx=True,
                         fp16_mode=use_fp16,
                     )
-                    torch.save(self.hifigan_decoder_trt.state_dict(), use_fp16)
+                    torch.save(self.hifigan_decoder_trt.state_dict(), trt_path)
             except Exception as error:
                 logging.error(f"Encountered exception generating hifigan_decoder TensorRT engine:\n{error}")
                 self.hifigan_decoder_trt = None
