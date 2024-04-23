@@ -360,7 +360,7 @@ class Xtts(BaseTTS):
                 audio = (audio / torch.abs(audio).max()) * 0.75
             if librosa_trim_db is not None:
                 audio = librosa.effects.trim(audio, top_db=librosa_trim_db)[0]
-
+            audio = torch.nan_to_num(audio)
             # compute latents for the decoder
             speaker_embedding = self.get_speaker_embedding(audio, load_sr)
             speaker_embeddings.append(speaker_embedding)
@@ -379,7 +379,7 @@ class Xtts(BaseTTS):
 
         return gpt_cond_latents, speaker_embedding
 
-    def synthesize(self, text, config, speaker_wav, language, speaker_id=None, **kwargs):
+    def synthesize(self, text, config, speaker_wav=[], language='en', speaker_id=None, **kwargs):
         """Synthesize speech with the given input text.
 
         Args:
@@ -395,6 +395,7 @@ class Xtts(BaseTTS):
             as latents used at inference.
 
         """
+        assert speaker_id or (type(speaker_wav) == 'list' and len(speaker_wav) > 0), 'provide at least one of speaker_wav or speaker_id for synthesize with xtts'
         assert (
             "zh-cn" if language == "zh" else language in self.config.languages
         ), f" ❗ Language {language} is not supported. Supported languages are {self.config.languages}"
@@ -754,6 +755,8 @@ class Xtts(BaseTTS):
             None
         """
 
+        if checkpoint_dir is None and checkpoint_path:
+            checkpoint_dir = os.path.dirname(checkpoint_path)
         model_path = checkpoint_path or os.path.join(checkpoint_dir, "model.pth")
         vocab_path = vocab_path or os.path.join(checkpoint_dir, "vocab.json")
 

@@ -265,6 +265,7 @@ class Synthesizer(nn.Module):
         reference_wav=None,
         reference_speaker_name=None,
         split_sentences: bool = True,
+        remove_special_chars: bool = False,
         **kwargs,
     ) -> List[int]:
         """🐸 TTS magic. Run all the models and generate speech.
@@ -296,6 +297,10 @@ class Synthesizer(nn.Module):
             if split_sentences:
                 print(" > Text splitted to sentences.")
                 sens = self.split_into_sentences(text)
+            if remove_special_chars:
+                special_chars = ['.', ',', ';', ':', '?', '!', '[', ']', '(', ')']
+                sens = [''.join(i for i in sen if not i in special_chars) for sen in sens]
+                print(" > Removed special characters.")
             print(sens)
 
         # handle multi-speaker

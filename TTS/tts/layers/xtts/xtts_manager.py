@@ -6,7 +6,8 @@ class SpeakerManager():
 
     @property
     def name_to_id(self):
-        return self.speakers.keys()
+        return {name: i for i, name in enumerate(self.speakers.keys())}
+        #return self.speakers.keys()
     
     @property
     def num_speakers(self):

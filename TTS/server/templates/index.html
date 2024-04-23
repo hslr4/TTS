@@ -33,26 +33,6 @@
     <a href="https://github.com/coqui-ai/TTS"><img style="position: absolute; z-index:1000; top: 0; left: 0; border: 0;"
             src="https://s3.amazonaws.com/github/ribbons/forkme_left_darkblue_121621.png" alt="Fork me on GitHub"></a>
 
-    <!-- Navigation -->
-    <!--
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-      <div class="container">
-        <a class="navbar-brand" href="#">Coqui TTS</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarResponsive">
-          <ul class="navbar-nav ml-auto">
-            <li class="nav-item active">
-              <a class="nav-link" href="#">Home
-                <span class="sr-only">(current)</span>
-              </a>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </nav>
-    -->
 
     <!-- Page Content -->
     <div class="container">
@@ -60,27 +40,47 @@
             <div class="col-lg-12 text-center">
                 <img class="mt-5" src="{{url_for('static', filename='coqui-log-green-TTS.png')}}" align="middle"
                     width="512" />
-
-                <ul class="list-unstyled">
-                </ul>
-
-                {%if use_gst%}
-                <input value='{"0": 0.1}' id="style_wav" placeholder="style wav (dict or path to wav).." size=45
-                    type="text" name="style_wav">
-                {%endif%}
-
+                <br /><br />
+                
                 <input id="text" placeholder="Type here..." size=45 type="text" name="text">
                 <button id="speak-button" name="speak">Speak</button><br /><br />
+                <div>
+                    {%if use_gst or use_clone %}
+                    Clone a voice from an audio sample:
+                    <input value='/root/TTS/data/female.wav' id="style_wav" placeholder="style wav (dict or path to wav).." size=45
+                        type="text" name="style_wav">
+                        <br /><br />
+                    {%endif%}
 
-                {%if use_multi_speaker%}
-                Choose a speaker:
-                <select id="speaker_id" name=speaker_id method="GET" action="/">
-                    {% for speaker_id in speaker_ids %}
-                    <option value="{{speaker_id}}" SELECTED>{{speaker_id}}</option>"
-                    {% endfor %}
-                </select><br /><br />
-                {%endif%}
+                    {%if use_multi_speaker%}
+                    Choose a predefined speaker (use None for cloning):<br />
+                    <select id="speaker_id" name=speaker_id method="GET" action="/">
+                        {%if use_clone %}
+                            <option value="">None</option>"
+                        {%endif%}
+                        {% for speaker_id in speaker_ids %}
+                        <option value="{{speaker_id}}" SELECTED>{{speaker_id}}</option>"
+                        {% endfor %}
+                    </select><br /><br />
+                    {%endif%}
+                    
+                    {%if pre_load_voice%}
+                        Voice cloning parameters:<br />
+                        {% for var in ['gpt_cond_len', 'gpt_cond_chunk_len', 'max_ref_length', 'librosa_trim_db']%}
+                            {{var}} <input id="{var}" size=3 type="number" name="{var}">
+                        {% endfor %}
+                        <br /><br />
 
+                        <button id="voice-button" name="voice">Update Voice</button><br /><br />
+
+                        Save the current voice:<br />
+                        <label for="voice-file">File name</label>
+                        <input id="voice-file" placeholder="File to save voice in, e.g. /root/TTS/data/custom_speakers_xtts.pth" value="{{voice_file}}" size=20 type="text" name="voice-file"> 
+                        <label for="voice-name">Voice name</label>
+                        <input id="voice-name" placeholder="Name to save voice as, e.g. andrea" size=10 type="text" name="voice-name"> 
+                        <button id="save-voice-button" name="save-voice">Save Voice</button><br /><br />
+                    {%endif%}
+                </div>
                 {%if use_multi_language%}
                 Choose a language:
                 <select id="language_id" name=language_id method="GET" action="/">
@@ -88,6 +88,17 @@
                     <option value="{{language_id}}" SELECTED>{{language_id}}</option>"
                     {% endfor %}
                 </select><br /><br />
+                {%endif%}
+                
+                {%if show_gen_args%}
+                    Set generation arguments:<br />
+                    Temperature: <input value=0.75 id="temperature" type="number" min="0" max="1" step="0.05" name="temperature"><br />
+                    Repetition Penalty: <input value=10.0 id="repetition_penalty" type="number" min="0" max="100" step="0.5" name="repetition_penalty"><br />
+                    Length Penalty: <input value=1.0 id="length_penalty" type="number" min="0" max="100" step="0.5" name="length_penalty"><br />
+                    Top K: <input value=50 id="top_k" type="number" min="1" max="100" step="1" name="top_k"><br />
+                    Top p: <input value=0.85 id="top_p" type="number" min="0.1" max="1" step="0.1" name="top_p"><br />
+                    Do sample: <input type="checkbox" id="do_sample" name="do_sample" checked /><br />
+                    <!-- GPT Condition Length (Cloning): <input value=30 id="gpt_cond_len" type="number" min="1" max="100" step="1" name="gpt_cond_len"><br /> -->
                 {%endif%}
 
 
@@ -110,6 +121,7 @@
             }
             return ""
         }
+
         function q(selector) { return document.querySelector(selector) }
         q('#text').focus()
         function do_tts(e) {
@@ -117,11 +129,18 @@
             const speaker_id = getTextValue('#speaker_id')
             const style_wav = getTextValue('#style_wav')
             const language_id = getTextValue('#language_id')
+            let temperature = getTextValue('#temperature')
+            const repetition_penalty = getTextValue('#repetition_penalty')
+            const length_penalty = getTextValue('#length_penalty')
+            let top_k = getTextValue('#top_k')
+            const top_p = getTextValue('#top_p')
+            const gpt_cond_len = getTextValue('#gpt_cond_len')
+            const do_sample = q('#do_sample') && q('#do_sample').checked
             if (text) {
                 q('#message').textContent = 'Synthesizing...'
                 q('#speak-button').disabled = true
                 q('#audio').hidden = true
-                synthesize(text, speaker_id, style_wav, language_id)
+                synthesize(text, speaker_id, style_wav, language_id, temperature, repetition_penalty, length_penalty, top_k, top_p, gpt_cond_len, do_sample)
             }
             e.preventDefault()
             return false
@@ -132,8 +151,8 @@
                 do_tts(e)
             }
         })
-        function synthesize(text, speaker_id = "", style_wav = "", language_id = "") {
-            fetch(`/api/tts?text=${encodeURIComponent(text)}&speaker_id=${encodeURIComponent(speaker_id)}&style_wav=${encodeURIComponent(style_wav)}&language_id=${encodeURIComponent(language_id)}`, { cache: 'no-cache' })
+        function synthesize(text, speaker_id = "", style_wav = "", language_id = "", temperature = "", repetition_penalty = "", length_penalty="", top_k="", top_p="", gpt_cond_len="", do_sample="") {
+            fetch(`/api/tts?text=${encodeURIComponent(text)}&speaker_id=${encodeURIComponent(speaker_id)}&style_wav=${encodeURIComponent(style_wav)}&language_id=${encodeURIComponent(language_id)}&temperature=${encodeURIComponent(temperature)}&repetition_penalty=${encodeURIComponent(repetition_penalty)}&length_penalty=${encodeURIComponent(length_penalty)}&top_k=${encodeURIComponent(top_k)}&top_p=${encodeURIComponent(top_p)}&gpt_cond_len=${encodeURIComponent(gpt_cond_len)}&do_sample=${encodeURIComponent(do_sample)}`, { cache: 'no-cache' })
                 .then(function (res) {
                     if (!res.ok) throw Error(res.statusText)
                     return res.blob()
@@ -147,6 +166,58 @@
                     q('#speak-button').disabled = false
                 })
         }
+
+        function update_voice(e) {
+            const speaker_id = getTextValue('#speaker_id')
+            const style_wav = getTextValue('#style_wav')
+            const gpt_cond_len = getTextValue('#gpt_cond_len')
+            const gpt_cond_chunk_len = getTextValue('#gpt_cond_chunk_len')
+            const max_ref_length = getTextValue('#max_ref_length')
+            const librosa_trim_db = getTextValue('#librosa_trim_db')
+            if (speaker_id || style_wav) {
+                q('#message').textContent = 'Updating...'
+                q('#voice-button').disabled = true
+                q('#speak-button').disabled = true
+                q('#audio').hidden = true
+                fetch(`/api/update_voice?speaker_id=${encodeURIComponent(speaker_id)}&speaker_wav=${encodeURIComponent(style_wav)}&gpt_cond_len=${encodeURIComponent(gpt_cond_len)}&gpt_cond_chunk_len=${encodeURIComponent(gpt_cond_chunk_len)}&max_ref_length=${encodeURIComponent(max_ref_length)}&librosa_trim_db=${encodeURIComponent(librosa_trim_db)}`, { cache: 'no-cache' })
+                .then(function (res) {
+                    if (!res.ok) throw Error(res.statusText)
+                    return 'updated voice'
+                }).then(function (msg) {
+                    q('#message').textContent = ''
+                    q('#voice-button').disabled = false
+                    q('#speak-button').disabled = false
+                }).catch(function (err) {
+                    q('#message').textContent = 'Error: ' + err.message
+                    q('#speak-button').disabled = false
+                    q('#voice-button').disabled = false
+                })
+            }
+            e.preventDefault()
+            return false
+        }
+        q('#voice-button').addEventListener('click', update_voice)
+
+        function save_voice(e) {
+            const name = getTextValue('#voice-name')
+            const file = getTextValue('#voice-file')
+            q('#message').textContent = 'Saving...'
+            q('#voice-button').disabled = true
+            fetch(`/api/save_voice?name=${encodeURIComponent(name)}&file=${encodeURIComponent(file)}`, { cache: 'no-cache' })
+            .then(function (res) {
+                if (!res.ok) throw Error(res.statusText)
+                return 'saved voice'
+            }).then(function (msg) {
+                q('#message').textContent = ''
+            }).catch(function (err) {
+                q('#message').textContent = 'Error: ' + err.message
+            }).finally(function () {
+                q('#voice-button').disabled = false
+            })
+            e.preventDefault()
+            return false
+        }
+        q('#save-voice-button').addEventListener('click', save_voice)
     </script>
 
 </body>
