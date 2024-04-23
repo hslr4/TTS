@@ -1,0 +1,79 @@
+FROM nvcr.io/nvidia/l4t-jetpack:r35.4.1
+
+ENV PYTHON_VERSION=3.10.9 PYTHON_VERSION_WO_PATCH=3.10
+
+RUN apt-get update && apt-get clean -y && apt-get install -y --no-install-recommends \
+apt-utils gcc g++ make espeak-ng libsndfile1-dev \
+build-essential zlib1g-dev libbz2-dev libsqlite3-dev \
+libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev curl software-properties-common \
+git libopenblas-dev libopenmpi-dev \
+libaio-dev \
+&& rm -rf /var/lib/apt/lists/* \
+&& apt remove cmake -y
+
+RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz && \
+tar -xf Python-${PYTHON_VERSION}.tar.xz && \
+cd Python-${PYTHON_VERSION} && \
+./configure --enable-loadable-sqlite-extensions --enable-optimizations && \
+make altinstall && \
+cd ../ && \
+rm -rf Python-${PYTHON_VERSION}.tar.xz \
+&& rm -rf Python-${PYTHON_VERSION}
+
+RUN update-alternatives --install /usr/bin/python python /usr/local/bin/python${PYTHON_VERSION_WO_PATCH} 10 \
+&& update-alternatives --set python /usr/local/bin/python${PYTHON_VERSION_WO_PATCH} \
+&& update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python${PYTHON_VERSION_WO_PATCH} 10 \
+&& update-alternatives --set python3 /usr/local/bin/python${PYTHON_VERSION_WO_PATCH} \
+&& ln -s -f /usr/bin/pip /usr/local/bin/pip10 \
+&& ln -s -f /usr/bin/pip3 /usr/local/bin/pip10
+
+RUN python -m pip install --upgrade pip && \
+python -m pip install llvmlite --ignore-installed && \
+python -m pip install --upgrade setuptools && \
+python -m pip install --upgrade cmake
+
+RUN apt-get update && apt-get -y remove --auto-remove python3.8 python3.9 && apt-get purge python3.8 python3.9 && \
+rm -rf /var/lib/apt/lists/* && \
+rm -rf /usr/lib/python3.8 /etc/python3.8 /usr/local/lib/python3.8 /usr/lib/python3.9 /etc/python3.9 /usr/local/lib/python3.9 && \
+rm -rf /var/lib/apt/lists/*
+
+ENV USE_NCCL=1 USE_DISTRIBUTED=1 USE_QNNPACK=0 USE_PYTORCH_QNNPACK=0 TORCH_CUDA_ARCH_LIST="7.2;8.7" PYTORCH_BUILD_VERSION=2.1 PYTORCH_BUILD_NUMBER=1 TORCHAUDIO_VERSION="release/2.1"
+RUN git clone --recursive --branch release/2.1 http://github.com/pytorch/pytorch && \
+cd pytorch && \
+python -m pip install -r requirements.txt && \
+python -m pip install scikit-build && \
+python -m pip install ninja && \
+python setup.py bdist_wheel && \
+cp dist/torch*.whl /opt && \
+    python -m pip install --no-cache-dir --verbose /opt/torch*.whl && \
+    cd ../ && \
+    rm -rf pytorch
+
+
+RUN git clone --branch ${TORCHAUDIO_VERSION} --recursive --depth=1 https://github.com/pytorch/audio torchaudio && \
+    cd torchaudio && \
+    git checkout ${TORCHAUDIO_VERSION} && \
+    sed -i 's#  URL https://zlib.net/zlib-1.2.11.tar.gz#  URL https://github.com/madler/zlib/archive/refs/tags/v1.2.12.tar.gz#g' third_party/zlib/CMakeLists.txt || echo "failed to patch torchaudio/third_party/zlib/CMakeLists.txt" && \
+    sed -i 's#  URL_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1#  URL_HASH SHA256=d8688496ea40fb61787500e863cc63c9afcbc524468cedeb478068924eb54932#g' third_party/zlib/CMakeLists.txt || echo "failed to patch torchaudio/third_party/zlib/CMakeLists.txt" && \
+    BUILD_SOX=1 python setup.py bdist_wheel && \
+    cp dist/torchaudio*.whl /opt && \
+    python -m pip install --no-cache-dir --verbose /opt/torchaudio*.whl && \
+    cd ../ && \
+    rm -rf torchaudio
+
+
+RUN TORCH_CUDA_ARCH_LIST="7.2;8.7" python -m pip install deepspeed && \
+rm -rf /root/.cache/pip
+
+# Copy TTS repository contents:
+WORKDIR /root/
+COPY . /root
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile=minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN make install && \
+rustup self uninstall -y
+
+ENTRYPOINT ["tts"]
+CMD ["--help"]

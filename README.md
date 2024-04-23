@@ -1,4 +1,9 @@
-
+## Differences to original coqui repo
+* xtts server in the original REST API coqui TTS server style
+  * coqui's [xtts-streaming-server](https://github.com/coqui-ai/xtts-streaming-server/tree/main) might be a better alternative though
+* Docker support for Nvidia Jetson esp. Orin
+  * [prebuilt image](https://hub.docker.com/r/marcelheisler/jetson_xtts)
+  
 ## 🐸Coqui.ai News
 - 📣 ⓍTTSv2 is here with 16 languages and better performance across the board.
 - 📣 ⓍTTS fine-tuning code is out. Check the [example recipes](https://github.com/coqui-ai/TTS/tree/dev/recipes/ljspeech).

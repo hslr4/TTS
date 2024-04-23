@@ -1,7 +1,11 @@
 .git/
+.github/
+dockerfiles/*
 Dockerfile
+DeepSpeed/
 build/
 dist/
+.vscode
 TTS.egg-info/
 tests/outputs/*
 tests/train_outputs/*
