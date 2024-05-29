@@ -755,11 +755,6 @@ class Xtts(BaseTTS):
             None
         """
 
-        if checkpoint_dir is None and checkpoint_path:
-            if os.path.isdir(os.path.dirname(checkpoint_path)):
-                checkpoint_dir = os.path.dirname(checkpoint_path)
-            elif os.path.isfile(os.path.dirname(checkpoint_path)):
-                checkpoint_dir = os.path.dirname(os.path.dirname(checkpoint_path))
         model_path = checkpoint_path or os.path.join(checkpoint_dir, "model.pth")
         vocab_path = vocab_path or os.path.join(checkpoint_dir, "vocab.json")
 
