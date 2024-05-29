@@ -65,7 +65,7 @@ config.load_json(config_path)
 model = Xtts.init_from_config(config)
 model.load_checkpoint(
     config,
-    checkpoint_path=os.path.dirname(model_path),
+    checkpoint_dir=os.path.dirname(model_path),
     speaker_file_path=args.speaker_embeddings_file,
     eval=True,
     use_deepspeed=args.use_deepspeed,

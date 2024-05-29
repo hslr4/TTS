@@ -802,7 +802,7 @@ class Xtts(BaseTTS):
             self.gpt.eval()
 
         if use_tensorrt:
-            use_fp16 = (flag == 'fp16' if isinstance(use_tensorrt, str) else True)
+            use_fp16 = (use_tensorrt == 'fp16' if isinstance(use_tensorrt, str) else False)
             trt_path = os.path.join(os.path.dirname(model_path), f"hifigan_decoder_{'fp16' if use_fp16 else 'fp32'}.trt")
             
             try:
