@@ -5,6 +5,8 @@
   * [prebuilt image](https://hub.docker.com/r/marcelheisler/jetson_xtts)
   
 ## 🐸Coqui.ai News
+** This fork adds support for quantization and TensorRT in xtts HiFiGAN decoder**
+
 - 📣 ⓍTTSv2 is here with 16 languages and better performance across the board.
 - 📣 ⓍTTS fine-tuning code is out. Check the [example recipes](https://github.com/coqui-ai/TTS/tree/dev/recipes/ljspeech).
 - 📣 ⓍTTS can now stream with <200ms latency.
@@ -17,7 +19,6 @@
 <img src="https://static.scarf.sh/a.png?x-pxid=cf317fe7-2188-4721-bc01-124bb5d5dbb2" />
 
 ## <img src="https://raw.githubusercontent.com/coqui-ai/TTS/main/images/coqui-log-green-TTS.png" height="56"/>
-
 
 **🐸TTS is a library for advanced Text-to-Speech generation.**
 

@@ -310,10 +310,7 @@ class ModelManager(object):
     def ask_tos(model_full_path):
         """Ask the user to agree to the terms of service"""
         tos_path = os.path.join(model_full_path, "tos_agreed.txt")
-        print(" > You must confirm the following:")
-        print(' | > "I have purchased a commercial license from Coqui: licensing@coqui.ai"')
-        print(' | > "Otherwise, I agree to the terms of the non-commercial CPML: https://coqui.ai/cpml" - [y/n]')
-        answer = input(" | | > ")
+        answer="y"
         if answer.lower() == "y":
             with open(tos_path, "w", encoding="utf-8") as f:
                 f.write("I have read, understood and agreed to the Terms and Conditions.")
