@@ -36,7 +36,7 @@ def create_argparser():
     parser.add_argument("--port", type=int, default=5002, help="port to listen on.")
     parser.add_argument("--use_cuda", type=convert_boolean, default=True, help="true to use CUDA.")
     parser.add_argument("--use_deepspeed", type=convert_boolean, default=False, help="true to use deepspeed.")
-    parser.add_argument("--use_tensorrt", type=convert_boolean, default=False, help="true to use tensorrt.")
+    parser.add_argument("--use_tensorrt", type=str, default='fp32', help="fp16, fp32 or True to use tensorrt, False otherwise.")
     parser.add_argument("--debug", type=convert_boolean, default=False, help="true to enable Flask debug mode.")
     parser.add_argument("--show_details", type=convert_boolean, default=False, help="Generate model detail page.")
     return parser
@@ -54,17 +54,22 @@ config_path = None
 if not model_path:
     model_path, config_path, model_item = manager.download_model(model_name)
 
+use_tensorrt = False
+if args.use_tensorrt == 'fp32':
+    use_tensorrt = True
+if args.use_tensorrt == 'fp16':
+    use_tensorrt = 'fp16'
 
 config = XttsConfig()
 config.load_json(config_path)
 model = Xtts.init_from_config(config)
 model.load_checkpoint(
     config,
-    checkpoint_path=model_path,
+    checkpoint_path=os.path.dirname(model_path),
     speaker_file_path=args.speaker_embeddings_file,
     eval=True,
     use_deepspeed=args.use_deepspeed,
-    use_tensorrt=args.use_tensorrt,
+    use_tensorrt=use_tensorrt,
 )
 if args.use_cuda:
     model.cuda()
