@@ -35,7 +35,8 @@ def create_argparser():
     parser.add_argument("--speaker_embeddings_file", type=str, help="name of file path for custom embeddings")#, default='/root/TTS/data/custom_speakers_xtts.pth'
     parser.add_argument("--port", type=int, default=5002, help="port to listen on.")
     parser.add_argument("--use_cuda", type=convert_boolean, default=True, help="true to use CUDA.")
-    parser.add_argument("--use_deepspeed", type=convert_boolean, default=True, help="true to use deepspeed.")
+    parser.add_argument("--use_deepspeed", type=convert_boolean, default=False, help="true to use deepspeed.")
+    parser.add_argument("--use_tensorrt", type=convert_boolean, default=False, help="true to use tensorrt.")
     parser.add_argument("--debug", type=convert_boolean, default=False, help="true to enable Flask debug mode.")
     parser.add_argument("--show_details", type=convert_boolean, default=False, help="Generate model detail page.")
     return parser
@@ -63,6 +64,7 @@ model.load_checkpoint(
     speaker_file_path=args.speaker_embeddings_file,
     eval=True,
     use_deepspeed=args.use_deepspeed,
+    use_tensorrt=args.use_tensorrt,
 )
 if args.use_cuda:
     model.cuda()

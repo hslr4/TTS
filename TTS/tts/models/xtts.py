@@ -738,6 +738,7 @@ class Xtts(BaseTTS):
         eval=True,
         strict=True,
         use_deepspeed=False,
+        use_tensorrt=False,
         speaker_file_path=None,
     ):
         """
