@@ -66,7 +66,7 @@
                     
                     {%if pre_load_voice%}
                         Voice cloning parameters:<br />
-                        {% for var in ['gpt_cond_len', 'gpt_cond_chunk_len', 'max_ref_length', 'librosa_trim_db']%}
+                        {% for var in ['gpt_cond_len', 'gpt_cond_chunk_len', 'max_ref_length', ]%} <!-- 'librosa_trim_db' -->
                             {{var}} <input id="{{var}}" size=3 type="number" name="{{var}}">
                         {% endfor %}
                         <br />

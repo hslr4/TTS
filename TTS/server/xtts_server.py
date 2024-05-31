@@ -135,7 +135,7 @@ def update_voice():
     with lock:
         speaker_id = request.headers.get("speaker-id") or request.values.get("speaker_id", "")
         speaker_wav = request.headers.get("speaker-wav") or request.values.get("speaker_wav", "")
-        int_args = ['gpt_cond_len', 'gpt_cond_chunk_len', 'max_ref_length', 'sound_norm_refs', 'librosa_trim_db']
+        int_args = ['gpt_cond_len', 'gpt_cond_chunk_len', 'max_ref_length', 'sound_norm_refs']#, 'librosa_trim_db'
         #gpt_cond_len=30, gpt_cond_chunk_len=4, max_ref_length=60 values from huggingface demo
         #max_ref_length=30,gpt_cond_len=6,gpt_cond_chunk_len=6,librosa_trim_db=None,sound_norm_refs=False #default values
         #num_gpt_outputs=1, gpt_cond_len=12, gpt_cond_chunk_len=4, max_ref_len=10, sound_norm_refs=False config default values
@@ -143,7 +143,7 @@ def update_voice():
         for a in int_args:
             v = request.headers.get(a.replace('_', '-')) or request.values.get(a, "")
             if v.isdigit():
-                cond_args[a] = v
+                cond_args[a] = int(v)
         sound_norm_refs = request.headers.get("sound-norm-refs") or request.values.get("sound_norm_refs", "")
         if sound_norm_refs:
             cond_args['sound_norm_refs'] = sound_norm_refs.lower() == 'true'
