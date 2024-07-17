@@ -582,7 +582,11 @@ class Xtts(BaseTTS):
                     ).transpose(1, 2)
 
                 gpt_latents_list.append(gpt_latents.cpu())
-                wavs.append(self.hifigan_decoder(gpt_latents, g=speaker_embedding).cpu().squeeze())
+                if self.hifigan_decoder_trt:
+                    wav_gen = self.hifigan_decoder_trt(gpt_latents, speaker_embedding)
+                else:
+                    wav_gen = self.hifigan_decoder(gpt_latents, speaker_embedding)
+                wavs.append(wav_gen.cpu().squeeze())
 
         return {
             "wav": torch.cat(wavs, dim=0).numpy(),
